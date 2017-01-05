@@ -19,17 +19,8 @@ object Account extends SkinnyCRUDMapper[Account] {
     createdAt = rs.get(a.createdAt)
   )
 
-  private def digestString(s: String): String = {
-    val md = MessageDigest.getInstance("SHA-1")
-    md.update(s.getBytes)
-    md.digest.foldLeft("") { (s, b) =>
-      s + "%02x".format(if (b < 0) b + 256 else b)
-    }
-  }
-
   def authenticate(email: String, password: String)(implicit s: DBSession): Option[Account] = {
-    val hashedPassword = digestString(password)
     val a = Account.defaultAlias
-    Account.where(sqls.eq(a.email, email).and.eq(a.password, hashedPassword)).apply().headOption
+    Account.where(sqls.eq(a.email, email).and.eq(a.password, password)).apply().headOption
   }
 }

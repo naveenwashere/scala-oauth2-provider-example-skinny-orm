@@ -4,12 +4,15 @@ import models._
 import play.api.libs.json.{Json, Writes}
 import play.api.mvc.{Action, Controller}
 import scalikejdbc.DB
+import scalikejdbc.config.DBs
 
 import scala.concurrent.Future
 import scalaoauth2.provider._
 import scalaoauth2.provider.OAuth2ProviderActionBuilders._
 
 class OAuthController extends Controller with OAuth2Provider {
+
+  DBs.setupAll()
 
   implicit val authInfoWrites = new Writes[AuthInfo[Account]] {
     def writes(authInfo: AuthInfo[Account]) = {
