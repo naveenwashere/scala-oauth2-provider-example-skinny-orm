@@ -1,7 +1,7 @@
 lazy val root = (project in file("."))
 .enablePlugins(PlayScala)
 .settings(
-  scalaVersion := "2.11.7",
+  scalaVersion := "2.11.8",
   scalacOptions := Seq("-language:_", "-deprecation", "-unchecked", "-feature", "-Xlint"),
   transitiveClassifiers in Global := Seq(Artifact.SourceClassifier),
   sources in (Compile, doc) := Nil,
