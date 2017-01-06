@@ -1,7 +1,7 @@
 # --- !Ups
 
 CREATE TABLE account (
-  id int(11) NOT NULL,
+  id int(11) NOT NULL AUTO_INCREMENT,
   email varchar(500) NOT NULL,
   PASSWORD varchar(100) NOT NULL,
   created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -9,12 +9,12 @@ CREATE TABLE account (
   UNIQUE KEY email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-INSERT INTO account (id, email, PASSWORD, created_at)
+INSERT INTO account (email, PASSWORD)
 VALUES
-	(2172704,'naveenwashere@yahoo.com','c6e2f08f1da18c37fc099eeb248f0f3408051503','2016-11-09 12:59:41');
+	('naveenwashere@yahoo.com','c6e2f08f1da18c37fc099eeb248f0f3408051503');
 
 CREATE TABLE oauth_client (
-  id bigint(20) NOT NULL,
+  id bigint(20) NOT NULL AUTO_INCREMENT,
   owner_id int(11) NOT NULL,
   grant_type varchar(20) NOT NULL,
   client_id varchar(100) NOT NULL,
@@ -27,12 +27,12 @@ CREATE TABLE oauth_client (
   CONSTRAINT oauth_client_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES account (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-INSERT INTO oauth_client (id, owner_id, grant_type, client_id, client_secret, redirect_uri, created_at)
+INSERT INTO oauth_client (owner_id, grant_type, client_id, client_secret, redirect_uri)
 VALUES
-	(1,2172704,'password','89b8f0ba-9de3-4464-a005-8fb9deb62069','JUoeOv7jEZYm-iBPgBAXHA','','2016-02-15 00:00:00');
+	(1,'password','89b8f0ba-9de3-4464-a005-8fb9deb62061','JUoeOv7jEZYm-iBPgBAXHA','');
 
 CREATE TABLE oauth_access_token (
-  id bigint(20) NOT NULL,
+  id bigint(20) NOT NULL AUTO_INCREMENT,
   account_id int(11) NOT NULL,
   oauth_client_id bigint(20) NOT NULL,
   access_token varchar(100) NOT NULL,
