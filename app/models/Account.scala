@@ -1,24 +1,32 @@
 package models
 
 import org.joda.time.DateTime
-import scalikejdbc._
-import skinny.orm._
+import play.api.Play
+import play.api.db.slick.DatabaseConfigProvider
+import slick.driver.JdbcProfile
+import slick.driver.MySQLDriver.api._
+import slick.lifted.Tag
+
 
 case class Account(id: Long, email: String, password: String, createdAt: DateTime)
-object Account extends SkinnyCRUDMapper[Account] {
+object Account {
 
-  override def defaultAlias = createAlias("a")
-  val ownerAlias = createAlias("owner")
+  val dbConfig = DatabaseConfigProvider.get[JdbcProfile](Play.current)
+  val accounts: TableQuery[AccountTableDef] =
+    TableQuery[AccountTableDef]((tag: Tag) => new AccountTableDef(tag))
 
-  override def extract(rs: WrappedResultSet, a: ResultName[Account]) = new Account(
-    id = rs.get(a.id),
-    email = rs.get(a.email),
-    password = rs.get(a.password),
-    createdAt = rs.get(a.createdAt)
-  )
-
-  def authenticate(email: String, password: String)(implicit s: DBSession): Option[Account] = {
-    val a = Account.defaultAlias
-    Account.where(sqls.eq(a.email, email).and.eq(a.password, password)).apply().headOption
+  def authenticate(email: String, password: String) = {
+    var query:Query[AccountTableDef, Account, Seq] = accounts.filter(_.email == email).filter(_.password == password)
+    query.result
   }
+}
+
+class AccountTableDef(tag: Tag) extends Table[Account](tag, "account") {
+  def id = column[Long]("id", O.PrimaryKey,O.AutoInc)
+  def email = column[String]("email")
+  def password = column[String]("password")
+  def createdAt = column[DateTime]("createdAt")
+
+  def * =
+    (id, email, password, createdAt) <>((Account.apply _).tupled, Account.unapply)
 }

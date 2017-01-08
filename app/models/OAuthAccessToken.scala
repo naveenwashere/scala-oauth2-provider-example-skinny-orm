@@ -3,8 +3,8 @@ package models
 import java.security.SecureRandom
 
 import org.joda.time.DateTime
-import scalikejdbc._
-import skinny.orm.SkinnyCRUDMapper
+import slick.lifted.Tag
+import slick.model.Table
 
 import scala.util.Random
 
@@ -19,24 +19,12 @@ case class OauthAccessToken(
   createdAt: DateTime
 )
 
-object OauthAccessToken extends SkinnyCRUDMapper[OauthAccessToken] {
-
-  override val tableName = "oauth_access_token"
-  override def defaultAlias = createAlias("oat")
+object OauthAccessToken {
 
   belongsTo[Account](Account, (oat, account) => oat.copy(account = account)).byDefault
   belongsTo[OauthClient](OauthClient, (oat, client) => oat.copy(oauthClient = client)).byDefault
 
-  override def extract(rs: WrappedResultSet, oat: ResultName[OauthAccessToken]) = new OauthAccessToken(
-    id = rs.long(oat.id),
-    accountId = rs.long(oat.accountId),
-    oauthClientId = rs.long(oat.oauthClientId),
-    accessToken = rs.string(oat.accessToken),
-    refreshToken = rs.string(oat.refreshToken),
-    createdAt = rs.jodaDateTime(oat.createdAt)
-  )
-
-  def create(account: Account, client: OauthClient)(implicit session: DBSession): OauthAccessToken = {
+  def create(account: Account, client: OauthClient): OauthAccessToken = {
     def randomString(length: Int) = new Random(new SecureRandom()).alphanumeric.take(length).mkString
     val accessToken = randomString(40)
     val refreshToken = randomString(40)
@@ -61,24 +49,24 @@ object OauthAccessToken extends SkinnyCRUDMapper[OauthAccessToken] {
     oauthAccessToken.copy(id = generatedId)
   }
 
-  def delete(account: Account, client: OauthClient)(implicit session: DBSession): Int = {
+  def delete(account: Account, client: OauthClient): Int = {
     OauthAccessToken.deleteBy(sqls
       .eq(column.accountId, account.id).and
       .eq(column.oauthClientId, client.id)
     )
   }
 
-  def refresh(account: Account, client: OauthClient)(implicit session: DBSession): OauthAccessToken = {
+  def refresh(account: Account, client: OauthClient): OauthAccessToken = {
     delete(account, client)
     create(account, client)
   }
 
-  def findByAccessToken(accessToken: String)(implicit session: DBSession): Option[OauthAccessToken] = {
+  def findByAccessToken(accessToken: String): Option[OauthAccessToken] = {
     val oat = OauthAccessToken.defaultAlias
     OauthAccessToken.where(sqls.eq(oat.accessToken, accessToken)).apply().headOption
   }
 
-  def findByAuthorized(account: Account, clientId: String)(implicit session: DBSession): Option[OauthAccessToken] = {
+  def findByAuthorized(account: Account, clientId: String): Option[OauthAccessToken] = {
     val oat = OauthAccessToken.defaultAlias
     val oac = OauthClient.defaultAlias
     OauthAccessToken.where(sqls
@@ -87,7 +75,7 @@ object OauthAccessToken extends SkinnyCRUDMapper[OauthAccessToken] {
     ).apply().headOption
   }
 
-  def findByRefreshToken(refreshToken: String)(implicit session: DBSession): Option[OauthAccessToken] = {
+  def findByRefreshToken(refreshToken: String): Option[OauthAccessToken] = {
     val expireAt = new DateTime().minusMonths(1)
     val oat = OauthAccessToken.defaultAlias
     OauthAccessToken.where(sqls
@@ -95,4 +83,15 @@ object OauthAccessToken extends SkinnyCRUDMapper[OauthAccessToken] {
       .gt(oat.createdAt, expireAt)
     ).apply().headOption
   }
+}
+
+class OauthAccessTokenTableDef(tag: Tag) extends Table[OauthAccessToken](tag, "oauth_access_token") {
+  def id = column[Long]("id", O.PrimaryKey,O.AutoInc)
+  def accountId = column[Long]("account_id")
+  def email = column[String]("email")
+  def password = column[String]("password")
+  def createdAt = column[DateTime]("createdAt")
+
+  override def * =
+    (id, email, password, createdAt) <>(OauthAccessToken.tupled, OauthAccessToken.unapply)
 }
