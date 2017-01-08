@@ -1,7 +1,5 @@
 package models
 
-import java.security.MessageDigest
-
 import org.joda.time.DateTime
 import scalikejdbc._
 import skinny.orm._
