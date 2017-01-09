@@ -1,13 +1,17 @@
 package models
 
+import java.sql.Timestamp
+
 import com.github.tototoshi.slick.MySQLJodaSupport._
 import org.joda.time.DateTime
+import play.api.Play.current
 import play.api.db.slick.DatabaseConfigProvider
 import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.driver.MySQLDriver.api._
 import slick.lifted.{ForeignKeyQuery, ProvenShape, TableQuery, Tag}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 case class OauthAuthorizationCode(
@@ -36,6 +40,12 @@ object OauthAuthorizationCode {
 }
 
 class OauthAuthorizationCodeTableDef(tag: Tag) extends Table[OauthAuthorizationCode](tag, "oauth_authorization_code") {
+  implicit def dateTime =
+    MappedColumnType.base[DateTime, Timestamp](
+      dt => new Timestamp(dt.getMillis),
+      ts => new DateTime(ts.getTime)
+    )
+
   val accounts: TableQuery[AccountTableDef] = TableQuery[AccountTableDef]
   val clients: TableQuery[OauthClientTableDef] = TableQuery[OauthClientTableDef]
 
@@ -43,7 +53,7 @@ class OauthAuthorizationCodeTableDef(tag: Tag) extends Table[OauthAuthorizationC
   def accountId: Rep[Long] = column[Long]("account_id")
   def oauthClientId: Rep[Long] = column[Long]("client_id")
   def code: Rep[String] = column[String]("code")
-  def redirectUri: Rep[String] = column[String]("redirect_uti")
+  def redirectUri: Rep[Option[String]] = column[Option[String]]("redirect_uti")
   def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
   def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_authorization_owner_id_fkey", accountId, accounts)(_.id)

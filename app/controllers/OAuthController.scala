@@ -47,15 +47,20 @@ class OAuthController extends Controller with OAuth2Provider {
     override def validateClient(request: AuthorizationRequest): Future[Boolean] = {
       val clientCredential = request.clientCredential.get
       OauthClient.validate(clientCredential.clientId, clientCredential.clientSecret.getOrElse(""), request.grantType)
+        .map(success => success)
     }
 
-    override def getStoredAccessToken(authInfo: AuthInfo[Account]): Future[Option[AccessToken]] =
+    /*override def getStoredAccessToken(authInfo: AuthInfo[Account]): Future[Option[AccessToken]] =
       OauthAccessToken.findByAuthorized(authInfo.user, authInfo.clientId.getOrElse(""))
+          .flatMap {
+            case Some(accessToken) => accessToken.get,
+            case None => None
+          }*/
 
     override def createAccessToken(authInfo: AuthInfo[Account]): Future[AccessToken] = {
       val clientId = authInfo.clientId.getOrElse(throw new InvalidClient())
       findByClientId(clientId)
-        .map(oauthClient => OauthAccessToken.create(authInfo.user, oauthClient))
+        .map(oauthClient => OauthAccessToken.create(authInfo.user, oauthClient.get))
           .map(oauthAccessToken => toAccessToken(oauthAccessToken.value.get.get))
     }
 
@@ -76,8 +81,8 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // Refresh token grant
 
-    override def findAuthInfoByRefreshToken(refreshToken: String): Future[Option[AuthInfo[Account]]] = {
-      Future.successful(OauthAccessToken.findByRefreshToken(refreshToken).flatMap { accessToken =>
+    /*override def findAuthInfoByRefreshToken(refreshToken: String): Future[Option[AuthInfo[Account]]] = {
+      OauthAccessToken.findByRefreshToken(refreshToken).flatMap(accessToken =>
         for {
           account <- accessToken.account
           client <- accessToken.oauthClient
@@ -88,20 +93,19 @@ class OAuthController extends Controller with OAuth2Provider {
             scope = None,
             redirectUri = None
           )
-        }
-      })
-    }
+        })
+    }*/
 
-    override def refreshAccessToken(authInfo: AuthInfo[Account], refreshToken: String): Future[AccessToken] = {
+    /*override def refreshAccessToken(authInfo: AuthInfo[Account], refreshToken: String): Future[AccessToken] = {
       val clientId = authInfo.clientId.getOrElse(throw new InvalidClient())
       val client = findByClientId(clientId).onSuccess(oauthClient => oauthClient.getOrElse(throw new InvalidClient())).andThen()
       val accessToken = OauthAccessToken.refresh(authInfo.user, client.)
       Future.successful(toAccessToken(accessToken))
-    }
+    }*/
 
     // Authorization code grant
 
-    override def findAuthInfoByCode(code: String): Future[Option[AuthInfo[Account]]] = {
+    /*override def findAuthInfoByCode(code: String): Future[Option[AuthInfo[Account]]] = {
       Future.successful(OauthAuthorizationCode.findByCode(code).map(authorization =>
         for {
           account <- authorization.account
@@ -115,7 +119,7 @@ class OAuthController extends Controller with OAuth2Provider {
           )
         }
         ))
-    }
+    }*/
 
     override def deleteAuthCode(code: String): Future[Unit] = {
       Future.successful(OauthAuthorizationCode.delete(code))
@@ -123,11 +127,11 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // Protected resource
 
-    override def findAccessToken(token: String): Future[Option[AccessToken]] = {
+    /*override def findAccessToken(token: String): Future[Option[AccessToken]] = {
       OauthAccessToken.findByAccessToken(token).map(toAccessToken => accessToken)
-    }
+    }*/
 
-    override def findAuthInfoByAccessToken(accessToken: AccessToken): Future[Option[AuthInfo[Account]]] = {
+    /*override def findAuthInfoByAccessToken(accessToken: AccessToken): Future[Option[AuthInfo[Account]]] = {
       OauthAccessToken.findByAccessToken(accessToken.token).map(accessToken =>
         for {
           account <- accessToken.get.account
@@ -141,6 +145,6 @@ class OAuthController extends Controller with OAuth2Provider {
           )
         }
         ))
-    }
+    }*/
   }
 }

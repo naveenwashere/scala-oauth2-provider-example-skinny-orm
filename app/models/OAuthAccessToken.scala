@@ -1,22 +1,25 @@
 package models
 
 import java.security.SecureRandom
+import java.sql.Timestamp
 
+import com.github.tototoshi.slick.MySQLJodaSupport._
 import org.joda.time.DateTime
+import play.api.Play.current
 import play.api.db.slick.DatabaseConfigProvider
+import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.driver.MySQLDriver.api._
 import slick.lifted.{ForeignKeyQuery, ProvenShape, TableQuery, Tag}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Random
-import com.github.tototoshi.slick.MySQLJodaSupport._
-import slick.backend.DatabaseConfig
 
 case class OauthAccessToken(
   id: Long,
   accountId: Long,
-  oauthClientId: Long,
+  oauthClientId: String,
   accessToken: String,
   refreshToken: String,
   createdAt: DateTime
@@ -33,7 +36,7 @@ object OauthAccessToken {
     val refreshToken = randomString(40)
     val createdAt = new DateTime()
 
-    val newToken = new OauthAccessToken(0, account.id, client.id, accessToken, refreshToken, createdAt)
+    val newToken = new OauthAccessToken(0, account.id, client.clientId, accessToken, refreshToken, createdAt)
     oauthtokens += newToken
 
     //We will definitely have the access token here!
@@ -41,7 +44,7 @@ object OauthAccessToken {
   }
 
   def delete(account: Account, client: OauthClient): Future[Int] = {
-    val query:Query[OauthAccessTokenTableDef, OauthAccessToken, Seq] = oauthtokens.filter(oauth => oauth.accountId === account.id && oauth.oauthClientId === client.id)
+    val query:Query[OauthAccessTokenTableDef, OauthAccessToken, Seq] = oauthtokens.filter(oauth => oauth.accountId === account.id && oauth.oauthClientId === client.clientId)
     dbConfig.db.run(query.delete).map(id => id)
   }
 
@@ -69,18 +72,24 @@ object OauthAccessToken {
 }
 
 class OauthAccessTokenTableDef(tag: Tag) extends Table[OauthAccessToken](tag, "oauth_access_token") {
+  implicit def dateTime =
+    MappedColumnType.base[DateTime, Timestamp](
+      dt => new Timestamp(dt.getMillis),
+      ts => new DateTime(ts.getTime)
+    )
+
   val accounts: TableQuery[AccountTableDef] = TableQuery[AccountTableDef]
   val clients: TableQuery[OauthClientTableDef] = TableQuery[OauthClientTableDef]
 
   def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
   def accountId: Rep[Long] = column[Long]("account_id")
-  def oauthClientId: Rep[Long] = column[Long]("oauth_client_id")
+  def oauthClientId: Rep[String] = column[String]("oauth_client_id")
   def accessToken: Rep[String] = column[String]("access_token")
   def refreshToken: Rep[String] = column[String]("refresh_token")
   def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
   def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_access_token_account_id_fkey", accountId, accounts)(_.id)
-  def client: ForeignKeyQuery[OauthClientTableDef, OauthClient] = foreignKey("oauth_access_token_oauth_client_id_fkey", oauthClientId, clients)(_.id)
+  def client: ForeignKeyQuery[OauthClientTableDef, OauthClient] = foreignKey("oauth_access_token_oauth_client_id_fkey", oauthClientId, clients)(_.clientId)
 
   override def * : ProvenShape[OauthAccessToken] = (id, accountId, oauthClientId, accessToken, refreshToken, createdAt) <> ((OauthAccessToken.apply _).tupled, OauthAccessToken.unapply)
 }
