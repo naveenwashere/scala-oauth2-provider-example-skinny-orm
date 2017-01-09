@@ -1,8 +1,9 @@
 package controllers
 
+import models.OauthClient._
 import models._
-import play.api.libs.json.{Json, Writes}
-import play.api.mvc.{Action, Controller}
+import play.api.libs.json.{JsObject, Json, Writes}
+import play.api.mvc.{Action, AnyContent, Controller}
 
 import scala.concurrent.Future
 import scalaoauth2.provider.OAuth2ProviderActionBuilders._
@@ -11,7 +12,7 @@ import scalaoauth2.provider._
 class OAuthController extends Controller with OAuth2Provider {
 
   implicit val authInfoWrites = new Writes[AuthInfo[Account]] {
-    def writes(authInfo: AuthInfo[Account]) = {
+    def writes(authInfo: AuthInfo[Account]): JsObject = {
       Json.obj(
         "account" -> Json.obj(
           "email" -> authInfo.user.email
@@ -31,11 +32,11 @@ class OAuthController extends Controller with OAuth2Provider {
     )
   }
 
-  def accessToken = Action.async { implicit request =>
+  def accessToken: Action[AnyContent] = Action.async { implicit request =>
     issueAccessToken(new MyDataHandler())
   }
 
-  def resources = AuthorizedAction(new MyDataHandler()) { request =>
+  def resources: Action[AnyContent] = AuthorizedAction(new MyDataHandler()) { request =>
     Ok(Json.toJson(request.authInfo))
   }
 
@@ -43,21 +44,19 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // common
 
-    override def validateClient(request: AuthorizationRequest): Future[Boolean] = { implicit session =>
-      Future.successful((for {
-        clientCredential <- request.clientCredential
-      } yield OauthClient.validate(clientCredential.clientId, clientCredential.clientSecret.getOrElse(""), request.grantType)).contains(true))
+    override def validateClient(request: AuthorizationRequest): Future[Boolean] = {
+      val clientCredential = request.clientCredential.get
+      OauthClient.validate(clientCredential.clientId, clientCredential.clientSecret.getOrElse(""), request.grantType)
     }
 
-    override def getStoredAccessToken(authInfo: AuthInfo[Account]): Future[Option[AccessToken]] = { implicit session =>
-      Future.successful(OauthAccessToken.findByAuthorized(authInfo.user, authInfo.clientId.getOrElse("")).map(toAccessToken))
-    }
+    override def getStoredAccessToken(authInfo: AuthInfo[Account]): Future[Option[AccessToken]] =
+      OauthAccessToken.findByAuthorized(authInfo.user, authInfo.clientId.getOrElse(""))
 
-    override def createAccessToken(authInfo: AuthInfo[Account]): Future[AccessToken] = DB.localTx { implicit session =>
+    override def createAccessToken(authInfo: AuthInfo[Account]): Future[AccessToken] = {
       val clientId = authInfo.clientId.getOrElse(throw new InvalidClient())
-      val oauthClient = OauthClient.findByClientId(clientId).getOrElse(throw new InvalidClient())
-      val accessToken = OauthAccessToken.create(authInfo.user, oauthClient)
-      Future.successful(toAccessToken(accessToken))
+      findByClientId(clientId)
+        .map(oauthClient => OauthAccessToken.create(authInfo.user, oauthClient))
+          .map(oauthAccessToken => toAccessToken(oauthAccessToken.value.get.get))
     }
 
     private val accessTokenExpireSeconds = 3600
@@ -71,26 +70,13 @@ class OAuthController extends Controller with OAuth2Provider {
       )
     }
 
-    override def findUser(request: AuthorizationRequest): Future[Option[Account]] = { implicit session =>
-      request match {
-        case request: PasswordRequest =>
-          Future.successful(Account.authenticate(request.username, request.password))
-        case request: ClientCredentialsRequest =>
-          val maybeAccount = request.clientCredential.flatMap { clientCredential =>
-            OauthClient.findClientCredentials(
-              clientCredential.clientId,
-              clientCredential.clientSecret.getOrElse("")
-            )
-          }
-          Future.successful(maybeAccount)
-        case _ =>
-          Future.successful(None)
-      }
+    override def findUser(request: AuthorizationRequest): Future[Option[Account]] = {
+      super.findUser(request)
     }
 
     // Refresh token grant
 
-    override def findAuthInfoByRefreshToken(refreshToken: String): Future[Option[AuthInfo[Account]]] = { implicit session =>
+    override def findAuthInfoByRefreshToken(refreshToken: String): Future[Option[AuthInfo[Account]]] = {
       Future.successful(OauthAccessToken.findByRefreshToken(refreshToken).flatMap { accessToken =>
         for {
           account <- accessToken.account
@@ -106,17 +92,17 @@ class OAuthController extends Controller with OAuth2Provider {
       })
     }
 
-    override def refreshAccessToken(authInfo: AuthInfo[Account], refreshToken: String): Future[AccessToken] = DB.localTx { implicit session =>
+    override def refreshAccessToken(authInfo: AuthInfo[Account], refreshToken: String): Future[AccessToken] = {
       val clientId = authInfo.clientId.getOrElse(throw new InvalidClient())
-      val client = OauthClient.findByClientId(clientId).getOrElse(throw new InvalidClient())
-      val accessToken = OauthAccessToken.refresh(authInfo.user, client)
+      val client = findByClientId(clientId).onSuccess(oauthClient => oauthClient.getOrElse(throw new InvalidClient())).andThen()
+      val accessToken = OauthAccessToken.refresh(authInfo.user, client.)
       Future.successful(toAccessToken(accessToken))
     }
 
     // Authorization code grant
 
-    override def findAuthInfoByCode(code: String): Future[Option[AuthInfo[Account]]] = { implicit session =>
-      Future.successful(OauthAuthorizationCode.findByCode(code).flatMap { authorization =>
+    override def findAuthInfoByCode(code: String): Future[Option[AuthInfo[Account]]] = {
+      Future.successful(OauthAuthorizationCode.findByCode(code).map(authorization =>
         for {
           account <- authorization.account
           client <- authorization.oauthClient
@@ -128,24 +114,24 @@ class OAuthController extends Controller with OAuth2Provider {
             redirectUri = authorization.redirectUri
           )
         }
-      })
+        ))
     }
 
-    override def deleteAuthCode(code: String): Future[Unit] = DB.localTx { implicit session =>
+    override def deleteAuthCode(code: String): Future[Unit] = {
       Future.successful(OauthAuthorizationCode.delete(code))
     }
 
     // Protected resource
 
-    override def findAccessToken(token: String): Future[Option[AccessToken]] = { implicit session =>
-      Future.successful(OauthAccessToken.findByAccessToken(token).map(toAccessToken))
+    override def findAccessToken(token: String): Future[Option[AccessToken]] = {
+      OauthAccessToken.findByAccessToken(token).map(toAccessToken => accessToken)
     }
 
-    override def findAuthInfoByAccessToken(accessToken: AccessToken): Future[Option[AuthInfo[Account]]] = { implicit session =>
-      Future.successful(OauthAccessToken.findByAccessToken(accessToken.token).flatMap { case accessToken =>
+    override def findAuthInfoByAccessToken(accessToken: AccessToken): Future[Option[AuthInfo[Account]]] = {
+      OauthAccessToken.findByAccessToken(accessToken.token).map(accessToken =>
         for {
-          account <- accessToken.account
-          client <- accessToken.oauthClient
+          account <- accessToken.get.account
+          client <- accessToken.get.oauthClient
         } yield {
           AuthInfo(
             user = account,
@@ -154,7 +140,7 @@ class OAuthController extends Controller with OAuth2Provider {
             redirectUri = None
           )
         }
-      })
+        ))
     }
   }
 }

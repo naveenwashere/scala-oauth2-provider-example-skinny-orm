@@ -27,7 +27,7 @@ object OauthAccessToken {
   private val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfigProvider.get[JdbcProfile]
   private val oauthtokens: TableQuery[OauthAccessTokenTableDef] = TableQuery[OauthAccessTokenTableDef]
 
-  def create(account: Account, client: OauthClient): Future[Option[OauthAccessToken]] = {
+  def create(account: Account, client: OauthClient): Future[OauthAccessToken] = {
     def randomString(length: Int) = new Random(new SecureRandom()).alphanumeric.take(length).mkString
     val accessToken = randomString(40)
     val refreshToken = randomString(40)
@@ -36,12 +36,13 @@ object OauthAccessToken {
     val newToken = new OauthAccessToken(0, account.id, client.id, accessToken, refreshToken, createdAt)
     oauthtokens += newToken
 
-    findByAccessToken(accessToken)
+    //We will definitely have the access token here!
+    findByAccessToken(accessToken).map(accessToken => accessToken.get)
   }
 
   def delete(account: Account, client: OauthClient): Future[Int] = {
     val query:Query[OauthAccessTokenTableDef, OauthAccessToken, Seq] = oauthtokens.filter(oauth => oauth.accountId === account.id && oauth.oauthClientId === client.id)
-    dbConfig.db.run(query.delete)
+    dbConfig.db.run(query.delete).map(id => id)
   }
 
   def refresh(account: Account, client: OauthClient): Future[Option[OauthAccessToken]] = {
@@ -51,18 +52,18 @@ object OauthAccessToken {
 
   def findByAccessToken(accessToken: String): Future[Option[OauthAccessToken]] = {
     val query:Query[OauthAccessTokenTableDef, OauthAccessToken, Seq] = oauthtokens.filter(_.accessToken === accessToken)
-    dbConfig.db.run(query.result.headOption)
+    dbConfig.db.run(query.result.headOption).map(oauthAccessToken => oauthAccessToken)
   }
 
   def findByAuthorized(account: Account, clientId: String): Future[Option[OauthAccessToken]] = {
     val query:Query[OauthAccessTokenTableDef, OauthAccessToken, Seq] = oauthtokens.filter(oauth => oauth.accountId === account.id && oauth.oauthClientId === clientId)
-    dbConfig.db.run(query.result.headOption)
+    dbConfig.db.run(query.result.headOption).map(oauthAccessToken => oauthAccessToken)
   }
 
   def findByRefreshToken(refreshToken: String): Future[Option[OauthAccessToken]] = {
     val expireAt = new DateTime().minusMonths(1)
     val query:Query[OauthAccessTokenTableDef, OauthAccessToken, Seq] = oauthtokens.filter(oauth => oauth.refreshToken === refreshToken && oauth.createdAt > expireAt)
-    dbConfig.db.run(query.result.headOption)
+    dbConfig.db.run(query.result.headOption).map(oauthAccessToken => oauthAccessToken)
   }
 
 }

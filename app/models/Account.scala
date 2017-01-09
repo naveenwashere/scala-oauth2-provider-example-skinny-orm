@@ -19,7 +19,12 @@ object Account {
 
   def authenticate(email: String, password: String): Future[Option[Account]] = {
     val query:Query[AccountTableDef, Account, Seq] = accounts.filter(account => account.email === email && account.password === password)
-    dbConfig.db.run(query.result.headOption)
+    dbConfig.db.run(query.result.headOption).map(account => account)
+  }
+
+  def findById(id: Long): Future[Option[Account]] = {
+    val query:Query[AccountTableDef, Account, Seq] = accounts.filter(_.id == id)
+    dbConfig.db.run(query.result.headOption).map(account => account)
   }
 }
 
