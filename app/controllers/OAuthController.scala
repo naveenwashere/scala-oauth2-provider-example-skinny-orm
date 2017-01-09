@@ -3,16 +3,12 @@ package controllers
 import models._
 import play.api.libs.json.{Json, Writes}
 import play.api.mvc.{Action, Controller}
-import scalikejdbc.DB
-import scalikejdbc.config.DBs
 
 import scala.concurrent.Future
-import scalaoauth2.provider._
 import scalaoauth2.provider.OAuth2ProviderActionBuilders._
+import scalaoauth2.provider._
 
 class OAuthController extends Controller with OAuth2Provider {
-
-  DBs.setupAll()
 
   implicit val authInfoWrites = new Writes[AuthInfo[Account]] {
     def writes(authInfo: AuthInfo[Account]) = {
@@ -47,13 +43,13 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // common
 
-    override def validateClient(request: AuthorizationRequest): Future[Boolean] = DB.readOnly { implicit session =>
+    override def validateClient(request: AuthorizationRequest): Future[Boolean] = { implicit session =>
       Future.successful((for {
         clientCredential <- request.clientCredential
       } yield OauthClient.validate(clientCredential.clientId, clientCredential.clientSecret.getOrElse(""), request.grantType)).contains(true))
     }
 
-    override def getStoredAccessToken(authInfo: AuthInfo[Account]): Future[Option[AccessToken]] = DB.readOnly { implicit session =>
+    override def getStoredAccessToken(authInfo: AuthInfo[Account]): Future[Option[AccessToken]] = { implicit session =>
       Future.successful(OauthAccessToken.findByAuthorized(authInfo.user, authInfo.clientId.getOrElse("")).map(toAccessToken))
     }
 
@@ -75,7 +71,7 @@ class OAuthController extends Controller with OAuth2Provider {
       )
     }
 
-    override def findUser(request: AuthorizationRequest): Future[Option[Account]] = DB.readOnly { implicit session =>
+    override def findUser(request: AuthorizationRequest): Future[Option[Account]] = { implicit session =>
       request match {
         case request: PasswordRequest =>
           Future.successful(Account.authenticate(request.username, request.password))
@@ -94,7 +90,7 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // Refresh token grant
 
-    override def findAuthInfoByRefreshToken(refreshToken: String): Future[Option[AuthInfo[Account]]] = DB.readOnly { implicit session =>
+    override def findAuthInfoByRefreshToken(refreshToken: String): Future[Option[AuthInfo[Account]]] = { implicit session =>
       Future.successful(OauthAccessToken.findByRefreshToken(refreshToken).flatMap { accessToken =>
         for {
           account <- accessToken.account
@@ -119,7 +115,7 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // Authorization code grant
 
-    override def findAuthInfoByCode(code: String): Future[Option[AuthInfo[Account]]] = DB.readOnly { implicit session =>
+    override def findAuthInfoByCode(code: String): Future[Option[AuthInfo[Account]]] = { implicit session =>
       Future.successful(OauthAuthorizationCode.findByCode(code).flatMap { authorization =>
         for {
           account <- authorization.account
@@ -141,11 +137,11 @@ class OAuthController extends Controller with OAuth2Provider {
 
     // Protected resource
 
-    override def findAccessToken(token: String): Future[Option[AccessToken]] = DB.readOnly { implicit session =>
+    override def findAccessToken(token: String): Future[Option[AccessToken]] = { implicit session =>
       Future.successful(OauthAccessToken.findByAccessToken(token).map(toAccessToken))
     }
 
-    override def findAuthInfoByAccessToken(accessToken: AccessToken): Future[Option[AuthInfo[Account]]] = DB.readOnly { implicit session =>
+    override def findAuthInfoByAccessToken(accessToken: AccessToken): Future[Option[AuthInfo[Account]]] = { implicit session =>
       Future.successful(OauthAccessToken.findByAccessToken(accessToken.token).flatMap { case accessToken =>
         for {
           account <- accessToken.account

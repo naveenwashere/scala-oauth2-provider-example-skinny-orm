@@ -1,50 +1,51 @@
 package models
 
-import models.OauthAccessToken._
 import org.joda.time.DateTime
-import scalikejdbc._
-import skinny.orm.SkinnyCRUDMapper
+import play.api.db.slick.DatabaseConfigProvider
+import slick.driver.JdbcProfile
+import slick.driver.MySQLDriver.api._
+import slick.lifted.{TableQuery, Tag}
+
+import scala.concurrent.Future
 
 case class OauthAuthorizationCode(
                                    id: Long,
                                    accountId: Long,
-                                   account: Option[Account] = None,
                                    oauthClientId: Long,
-                                   oauthClient: Option[OauthClient] = None,
                                    code: String,
                                    redirectUri: Option[String],
                                    createdAt: DateTime)
 
-object OauthAuthorizationCode extends SkinnyCRUDMapper[OauthAuthorizationCode] {
+object OauthAuthorizationCode {
 
-  override val tableName = "oauth_authorization_code"
-  override def defaultAlias = createAlias("oac")
+  val dbConfig = DatabaseConfigProvider.get[JdbcProfile]
+  val oauthcodes = TableQuery[OauthAuthorizationCodeTableDef]
 
-  belongsTo[Account](Account, (oac, account) => oac.copy(account = account)).byDefault
-  belongsTo[OauthClient](OauthClient, (oac, client) => oac.copy(oauthClient = client)).byDefault
-
-  override def extract(rs: WrappedResultSet, oac: ResultName[OauthAuthorizationCode]) = new OauthAuthorizationCode(
-    id = rs.long(oac.id),
-    accountId = rs.long(oac.accountId),
-    oauthClientId = rs.long(oac.oauthClientId),
-    code = rs.string(oac.code),
-    redirectUri = rs.stringOpt(oac.redirectUri),
-    createdAt = rs.jodaDateTime(oac.createdAt)
-  )
-
-  def findByCode(code: String)(implicit session: DBSession): Option[OauthAuthorizationCode] = {
-    val oac = OauthAuthorizationCode.defaultAlias
-    val expireAt = new DateTime().minusMinutes(30)
-    OauthAuthorizationCode.where(
-      sqls
-        .eq(oac.code, code).and
-        .gt(oac.createdAt, expireAt)
-    ).apply().headOption
+  def findByCode(code: String): Future[Option[OauthAuthorizationCode]] = {
+    val expireAt = new DateTime().minusMinutes(30).millisOfSecond()
+    var query:Query[OauthAuthorizationCodeTableDef, OauthAuthorizationCode, Seq] = oauthcodes.filter(authcode => authcode.code === code && authcode.createdAt > expireAt)
+    dbConfig.db.run(query.result.headOption)
   }
 
-  def delete(code: String)(implicit session: DBSession): Unit = {
-    OauthAuthorizationCode.deleteBy(sqls
-      .eq(column.code, code)
-    )
+  def delete(code: String): Unit = {
+    var query:Query[OauthAuthorizationCodeTableDef, OauthAuthorizationCode, Seq] = oauthcodes.filter(_.code === code)
+    dbConfig.db.run(query.delete)
   }
+}
+
+class OauthAuthorizationCodeTableDef(tag: Tag) extends Table[OauthAuthorizationCode](tag, "oauth_authorization_code") {
+  val accounts = TableQuery[AccountTableDef]
+  val clients = TableQuery[OauthClientTableDef]
+
+  def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+  def accountId = column[Long]("account_id")
+  def oauthClientId = column[Long]("client_id")
+  def code = column[String]("code")
+  def redirectUri = column[String]("redirect_uti")
+  def createdAt = column[DateTime]("created_at")
+
+  def account = foreignKey("oauth_authorization_owner_id_fkey", accountId, accounts)(_.id)
+  def client = foreignKey("oauth_authorization_client_id_fkey", oauthClientId, clients)(_.id)
+
+  def * = (id, accountId, oauthClientId, code, redirectUri, createdAt) <> ((OauthAuthorizationCode.apply _).tupled, OauthAuthorizationCode.unapply)
 }

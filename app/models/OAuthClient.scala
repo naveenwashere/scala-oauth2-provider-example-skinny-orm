@@ -1,13 +1,16 @@
 package models
 
 import org.joda.time.DateTime
-import scalikejdbc._
-import skinny.orm._
+import play.api.db.slick.DatabaseConfigProvider
+import slick.driver.JdbcProfile
+import slick.driver.MySQLDriver.api._
+import slick.lifted.{TableQuery, Tag}
+
+import scala.concurrent.Future
 
 case class OauthClient(
   id: Long,
   ownerId: Long,
-  owner: Option[Account] = None,
   grantType: String,
   clientId: String,
   clientSecret: String,
@@ -15,47 +18,39 @@ case class OauthClient(
   createdAt: DateTime
 )
 
-object OauthClient extends SkinnyCRUDMapper[OauthClient] {
+object OauthClient {
 
-  override val tableName = "oauth_client"
-  override def defaultAlias = createAlias("oc")
+  val dbConfig = DatabaseConfigProvider.get[JdbcProfile]
+  val clients = TableQuery[OauthClientTableDef]
 
-  override def extract(rs: WrappedResultSet, oc: ResultName[OauthClient]) = new OauthClient(
-    id = rs.long(oc.id),
-    ownerId = rs.long(oc.ownerId),
-    grantType = rs.string(oc.grantType),
-    clientId = rs.string(oc.clientId),
-    clientSecret = rs.string(oc.clientSecret),
-    redirectUri = rs.stringOpt(oc.redirectUri),
-    createdAt = rs.jodaDateTime(oc.createdAt)
-  )
-
-  innerJoinWithDefaults(Account, (c, owner) => sqls.eq(c.ownerId, owner.id)).byDefaultEvenIfAssociated
-  val owner = belongsToWithAlias[Account](Account -> Account.ownerAlias, (c, owner) => c.copy(owner = owner)).byDefault
-
-  def validate(clientId: String, clientSecret: String, grantType: String)(implicit s: DBSession): Boolean = {
-    val oc = OauthClient.defaultAlias
-    OauthClient.where(sqls
-      .eq(oc.clientId, clientId).and
-      .eq(oc.clientSecret, clientSecret)
-    ).apply().headOption.map { client =>
-      grantType == client.grantType || grantType == "refresh_token"
-    }.getOrElse(false)
+  def validate(clientId: String, clientSecret: String, grantType: String): Future[Boolean] = {
+    var query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId).filter(_.clientSecret === clientSecret)
+    dbConfig.db.run(query.result.headOption).map(client => grantType == client.get.grantType || grantType == "refresh_token")
   }
 
-  def findByClientId(clientId: String)(implicit s: DBSession): Option[OauthClient] = {
-    val oc = OauthClient.defaultAlias
-    OauthClient.where(sqls
-      .eq(oc.clientId, clientId)
-    ).apply().headOption
+  def findByClientId(clientId: String): Future[Option[OauthClient]] = {
+    var query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId)
+    dbConfig.db.run(query.result.headOption)
   }
 
-  def findClientCredentials(clientId: String, clientSecret: String)(implicit session: DBSession): Option[Account] = {
-    val oc = OauthClient.defaultAlias
-    OauthClient.where(sqls
-      .eq(oc.clientId, clientId).and
-      .eq(oc.clientSecret, clientSecret).and
-      .eq(oc.grantType, "client_credentials")
-    ).apply().headOption.flatMap { _.owner }
+  def findClientCredentials(clientId: String, clientSecret: String): Future[Option[OauthClient]] = {
+    var query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId).filter(client => client.clientSecret === clientSecret && client.grantType === "client_credentials")
+    dbConfig.db.run(query.result.headOption)
   }
+}
+
+class OauthClientTableDef(tag: Tag) extends Table[OauthClient](tag, "oauth_client") {
+  val accounts = TableQuery[AccountTableDef]
+
+  def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+  def ownerId = column[Long]("owner_id")
+  def grantType = column[String]("grant_type")
+  def clientId = column[String]("client_id")
+  def clientSecret = column[String]("client_secret")
+  def redirectUri = column[String]("redirect_uti")
+  def createdAt = column[DateTime]("created_at")
+
+  def account = foreignKey("oauth_client_owner_id_fkey", ownerId, accounts)(_.id)
+
+  def * = (id, ownerId, grantType, clientId, clientSecret, redirectUri, createdAt) <> ((OauthClient.apply _).tupled, OauthClient.unapply)
 }
