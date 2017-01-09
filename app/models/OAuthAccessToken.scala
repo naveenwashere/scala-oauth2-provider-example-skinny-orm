@@ -45,7 +45,7 @@ object OauthAccessToken {
     dbConfig.db.run(query.delete).map(id => id)
   }
 
-  def refresh(account: Account, client: OauthClient): Future[Option[OauthAccessToken]] = {
+  def refresh(account: Account, client: OauthClient): Future[OauthAccessToken] = {
     delete(account, client)
     create(account, client)
   }

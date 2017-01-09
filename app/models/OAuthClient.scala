@@ -29,9 +29,9 @@ object OauthClient {
     dbConfig.db.run(query.result.headOption).map(client => grantType == client.get.grantType || grantType == "refresh_token").map(booleanVal => booleanVal)
   }
 
-  def findByClientId(clientId: String): Future[OauthClient] = {
+  def findByClientId(clientId: String): Future[Option[OauthClient]] = {
     val query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId)
-    dbConfig.db.run(query.result.headOption).map(oauthClient => oauthClient.get)
+    dbConfig.db.run(query.result.headOption).map(oauthClient => oauthClient)
   }
 
   def findClientCredentials(clientId: String, clientSecret: String): Future[Option[OauthClient]] = {
