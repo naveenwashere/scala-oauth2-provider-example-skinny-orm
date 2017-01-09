@@ -1,10 +1,12 @@
 package models
 
+import com.github.tototoshi.slick.MySQLJodaSupport._
 import org.joda.time.DateTime
 import play.api.db.slick.DatabaseConfigProvider
+import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.driver.MySQLDriver.api._
-import slick.lifted.{TableQuery, Tag}
+import slick.lifted.{ForeignKeyQuery, ProvenShape, TableQuery, Tag}
 
 import scala.concurrent.Future
 
@@ -18,34 +20,34 @@ case class OauthAuthorizationCode(
 
 object OauthAuthorizationCode {
 
-  val dbConfig = DatabaseConfigProvider.get[JdbcProfile]
-  val oauthcodes = TableQuery[OauthAuthorizationCodeTableDef]
+  private val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfigProvider.get[JdbcProfile]
+  private val oauthcodes: TableQuery[OauthAuthorizationCodeTableDef] = TableQuery[OauthAuthorizationCodeTableDef]
 
   def findByCode(code: String): Future[Option[OauthAuthorizationCode]] = {
-    val expireAt = new DateTime().minusMinutes(30).millisOfSecond()
-    var query:Query[OauthAuthorizationCodeTableDef, OauthAuthorizationCode, Seq] = oauthcodes.filter(authcode => authcode.code === code && authcode.createdAt > expireAt)
+    val expireAt = new DateTime()().minusMinutes(30)
+    val query:Query[OauthAuthorizationCodeTableDef, OauthAuthorizationCode, Seq] = oauthcodes.filter(authcode => (authcode.code === code) && (authcode.createdAt > expireAt))
     dbConfig.db.run(query.result.headOption)
   }
 
   def delete(code: String): Unit = {
-    var query:Query[OauthAuthorizationCodeTableDef, OauthAuthorizationCode, Seq] = oauthcodes.filter(_.code === code)
+    val query:Query[OauthAuthorizationCodeTableDef, OauthAuthorizationCode, Seq] = oauthcodes.filter(_.code === code)
     dbConfig.db.run(query.delete)
   }
 }
 
 class OauthAuthorizationCodeTableDef(tag: Tag) extends Table[OauthAuthorizationCode](tag, "oauth_authorization_code") {
-  val accounts = TableQuery[AccountTableDef]
-  val clients = TableQuery[OauthClientTableDef]
+  val accounts: TableQuery[AccountTableDef] = TableQuery[AccountTableDef]
+  val clients: TableQuery[OauthClientTableDef] = TableQuery[OauthClientTableDef]
 
-  def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-  def accountId = column[Long]("account_id")
-  def oauthClientId = column[Long]("client_id")
-  def code = column[String]("code")
-  def redirectUri = column[String]("redirect_uti")
-  def createdAt = column[DateTime]("created_at")
+  def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
+  def accountId: Rep[Long] = column[Long]("account_id")
+  def oauthClientId: Rep[Long] = column[Long]("client_id")
+  def code: Rep[String] = column[String]("code")
+  def redirectUri: Rep[String] = column[String]("redirect_uti")
+  def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
-  def account = foreignKey("oauth_authorization_owner_id_fkey", accountId, accounts)(_.id)
-  def client = foreignKey("oauth_authorization_client_id_fkey", oauthClientId, clients)(_.id)
+  def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_authorization_owner_id_fkey", accountId, accounts)(_.id)
+  def client: ForeignKeyQuery[OauthClientTableDef, OauthClient] = foreignKey("oauth_authorization_client_id_fkey", oauthClientId, clients)(_.id)
 
-  def * = (id, accountId, oauthClientId, code, redirectUri, createdAt) <> ((OauthAuthorizationCode.apply _).tupled, OauthAuthorizationCode.unapply)
+  def * : ProvenShape[OauthAuthorizationCode] = (id, accountId, oauthClientId, code, redirectUri, createdAt) <> ((OauthAuthorizationCode.apply _).tupled, OauthAuthorizationCode.unapply)
 }

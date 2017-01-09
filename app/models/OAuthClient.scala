@@ -2,9 +2,10 @@ package models
 
 import org.joda.time.DateTime
 import play.api.db.slick.DatabaseConfigProvider
+import slick.backend.DatabaseConfig
 import slick.driver.JdbcProfile
 import slick.driver.MySQLDriver.api._
-import slick.lifted.{TableQuery, Tag}
+import slick.lifted.{ForeignKeyQuery, ProvenShape, TableQuery, Tag}
 
 import scala.concurrent.Future
 
@@ -20,37 +21,37 @@ case class OauthClient(
 
 object OauthClient {
 
-  val dbConfig = DatabaseConfigProvider.get[JdbcProfile]
-  val clients = TableQuery[OauthClientTableDef]
+  private val dbConfig: DatabaseConfig[JdbcProfile] = DatabaseConfigProvider.get[JdbcProfile]
+  private val clients: TableQuery[OauthClientTableDef] = TableQuery[OauthClientTableDef]
 
   def validate(clientId: String, clientSecret: String, grantType: String): Future[Boolean] = {
-    var query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId).filter(_.clientSecret === clientSecret)
+    val query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId).filter(_.clientSecret === clientSecret)
     dbConfig.db.run(query.result.headOption).map(client => grantType == client.get.grantType || grantType == "refresh_token")
   }
 
   def findByClientId(clientId: String): Future[Option[OauthClient]] = {
-    var query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId)
+    val query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId)
     dbConfig.db.run(query.result.headOption)
   }
 
   def findClientCredentials(clientId: String, clientSecret: String): Future[Option[OauthClient]] = {
-    var query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId).filter(client => client.clientSecret === clientSecret && client.grantType === "client_credentials")
+    val query:Query[OauthClientTableDef, OauthClient, Seq] = clients.filter(_.clientId === clientId).filter(client => client.clientSecret === clientSecret && client.grantType === "client_credentials")
     dbConfig.db.run(query.result.headOption)
   }
 }
 
 class OauthClientTableDef(tag: Tag) extends Table[OauthClient](tag, "oauth_client") {
-  val accounts = TableQuery[AccountTableDef]
+  val accounts: TableQuery[AccountTableDef] = TableQuery[AccountTableDef]
 
-  def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
-  def ownerId = column[Long]("owner_id")
-  def grantType = column[String]("grant_type")
-  def clientId = column[String]("client_id")
-  def clientSecret = column[String]("client_secret")
-  def redirectUri = column[String]("redirect_uti")
-  def createdAt = column[DateTime]("created_at")
+  def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
+  def ownerId: Rep[Long] = column[Long]("owner_id")
+  def grantType: Rep[String] = column[String]("grant_type")
+  def clientId: Rep[String] = column[String]("client_id")
+  def clientSecret: Rep[String] = column[String]("client_secret")
+  def redirectUri: Rep[String] = column[String]("redirect_uti")
+  def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
-  def account = foreignKey("oauth_client_owner_id_fkey", ownerId, accounts)(_.id)
+  def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_client_owner_id_fkey", ownerId, accounts)(_.id)
 
-  def * = (id, ownerId, grantType, clientId, clientSecret, redirectUri, createdAt) <> ((OauthClient.apply _).tupled, OauthClient.unapply)
+  def * : ProvenShape[OauthClient] = (id, ownerId, grantType, clientId, clientSecret, redirectUri, createdAt) <> ((OauthClient.apply _).tupled, OauthClient.unapply)
 }

@@ -16,7 +16,7 @@ lazy val root = (project in file("."))
     "com.typesafe.play" %% "play-slick" % "2.0.0",
     "com.typesafe.play" %% "play-slick-evolutions" % "2.0.0",
     "mysql" % "mysql-connector-java" % "5.1.12",
-    "com.github.tototoshi" %% "slick-joda-mapper" % "1.2.0"
+    "com.github.tototoshi" %% "slick-joda-mapper" % "2.2.0"
   )
 )
 
