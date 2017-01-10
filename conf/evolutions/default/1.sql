@@ -7,7 +7,7 @@ CREATE TABLE account (
   created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY email (email)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8;
 
 INSERT INTO account (email, PASSWORD)
 VALUES
@@ -24,8 +24,8 @@ CREATE TABLE oauth_client (
   PRIMARY KEY (id),
   UNIQUE KEY oauth_client_client_id_key (client_id),
   KEY oauth_client_owner_id_fkey (owner_id),
-  CONSTRAINT oauth_client_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES account (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  CONSTRAINT FOREIGN KEY (owner_id) REFERENCES account (id) ON DELETE CASCADE
+) DEFAULT CHARSET=utf8;
 
 INSERT INTO oauth_client (owner_id, grant_type, client_id, client_secret, redirect_uri)
 VALUES
@@ -34,7 +34,7 @@ VALUES
 CREATE TABLE oauth_access_token (
   id bigint(20) NOT NULL AUTO_INCREMENT,
   account_id int(11) NOT NULL,
-  oauth_client_id bigint(20) NOT NULL,
+  oauth_client_id varchar(100) NOT NULL,
   access_token varchar(100) NOT NULL,
   refresh_token varchar(100) NOT NULL,
   created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -42,5 +42,5 @@ CREATE TABLE oauth_access_token (
   KEY oauth_access_token_account_id_fkey (account_id),
   KEY oauth_access_token_oauth_client_id_fkey (oauth_client_id),
   CONSTRAINT oauth_access_token_account_id_fkey FOREIGN KEY (account_id) REFERENCES account (id) ON DELETE CASCADE,
-  CONSTRAINT oauth_access_token_oauth_client_id_fkey FOREIGN KEY (oauth_client_id) REFERENCES oauth_client (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  CONSTRAINT oauth_access_token_oauth_client_id_fkey FOREIGN KEY (oauth_client_id) REFERENCES oauth_client (client_id) ON DELETE CASCADE
+) DEFAULT CHARSET=utf8;

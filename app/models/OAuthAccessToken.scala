@@ -36,11 +36,12 @@ object OauthAccessToken {
     val refreshToken = randomString(40)
     val createdAt = new DateTime()
 
-    val newToken = new OauthAccessToken(0, account.id, client.clientId, accessToken, refreshToken, createdAt)
-    oauthtokens += newToken
-
-    //We will definitely have the access token here!
-    findByAccessToken(accessToken).map(accessToken => accessToken.get)
+    dbConfig.db.run(DBIO.seq(oauthtokens += OauthAccessToken(0, account.id, client.clientId, accessToken, refreshToken, createdAt))).flatMap(_ => {
+      //We will definitely have the access token here!
+      findByAccessToken(accessToken).map {accessToken => accessToken match {
+        case Some(accessToken) => accessToken
+      }}
+    })
   }
 
   def delete(account: Account, client: OauthClient): Future[Int] = {

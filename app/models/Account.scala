@@ -40,7 +40,7 @@ class AccountTableDef(tag: Tag) extends Table[Account](tag, "account") {
   def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
   def email: Rep[String] = column[String]("email")
   def password: Rep[String] = column[String]("password")
-  def createdAt: Rep[DateTime] = column[DateTime]("createdAt")
+  def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
   def * : ProvenShape[Account] = (id, email, password, createdAt) <> ((Account.apply _).tupled, Account.unapply)
 }
