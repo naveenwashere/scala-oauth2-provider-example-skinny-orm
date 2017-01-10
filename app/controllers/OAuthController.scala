@@ -81,10 +81,13 @@ class OAuthController extends Controller with OAuth2Provider {
         case request: PasswordRequest =>
           Account.authenticate(request.username, request.password)
         case request: ClientCredentialsRequest =>
-          for {
-            credential <- request.clientCredential
-            oauthClient <- OauthClient.findClientCredentials(credential.clientId, credential.clientSecret.getOrElse(""))
-          } yield Account.findById(oauthClient.get.ownerId)
+          request.clientCredential match {
+            case Some(credential) =>
+              OauthClient.findClientCredentials(credential.clientId, credential.clientSecret.getOrElse(""))
+                  .flatMap(oauthClient => Account.findById(oauthClient.get.ownerId))
+            case None =>
+              Future.successful(None)
+          }
         case _ =>
           Future.successful(None)
       }
@@ -98,12 +101,12 @@ class OAuthController extends Controller with OAuth2Provider {
         account <- Account.findById(oauthAccessToken.get.accountId)
         client <- OauthClient.findByClientId(oauthAccessToken.get.oauthClientId)
       } yield {
-        AuthInfo(
-          user = account,
+        Option(AuthInfo(
+          user = account.get,
           clientId = Some(client.get.clientId),
           scope = None,
           redirectUri = None
-        )
+        ))
       }
     }
 
@@ -124,12 +127,12 @@ class OAuthController extends Controller with OAuth2Provider {
           account <- Account.findById(authorization.get.accountId)
           client <- OauthClient.findByClientId(authorization.get.oauthClientId)
         } yield {
-          AuthInfo(
-            user = account,
+          Option(AuthInfo(
+            user = account.get,
             clientId = Some(client.get.clientId),
             scope = None,
             redirectUri = authorization.get.redirectUri
-          )
+          ))
         }
     }
 
@@ -152,12 +155,12 @@ class OAuthController extends Controller with OAuth2Provider {
         account <- Account.findById(accessToken.get.accountId)
         client <- OauthClient.findByClientId(accessToken.get.oauthClientId)
       } yield {
-        AuthInfo(
-          user = account,
+        Option(AuthInfo(
+          user = account.get,
           clientId = Some(client.get.clientId),
           scope = None,
           redirectUri = None
-        )
+        ))
       }
     }
   }
