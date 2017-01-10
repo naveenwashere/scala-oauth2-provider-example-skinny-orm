@@ -53,7 +53,7 @@ class OauthAuthorizationCodeTableDef(tag: Tag) extends Table[OauthAuthorizationC
   def accountId: Rep[Long] = column[Long]("account_id")
   def oauthClientId: Rep[String] = column[String]("client_id")
   def code: Rep[String] = column[String]("code")
-  def redirectUri: Rep[Option[String]] = column[Option[String]]("redirect_uti")
+  def redirectUri: Rep[Option[String]] = column[Option[String]]("redirect_uri")
   def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
   def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_authorization_owner_id_fkey", accountId, accounts)(_.id)

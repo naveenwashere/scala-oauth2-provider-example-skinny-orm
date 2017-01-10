@@ -58,7 +58,7 @@ class OauthClientTableDef(tag: Tag) extends Table[OauthClient](tag, "oauth_clien
   def grantType: Rep[String] = column[String]("grant_type")
   def clientId: Rep[String] = column[String]("client_id")
   def clientSecret: Rep[String] = column[String]("client_secret")
-  def redirectUri: Rep[Option[String]] = column[Option[String]]("redirect_uti")
+  def redirectUri: Rep[Option[String]] = column[Option[String]]("redirect_uri")
   def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
   def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_client_owner_id_fkey", ownerId, accounts)(_.id)
