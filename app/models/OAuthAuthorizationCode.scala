@@ -17,7 +17,7 @@ import scala.concurrent.Future
 case class OauthAuthorizationCode(
                                    id: Long,
                                    accountId: Long,
-                                   oauthClientId: Long,
+                                   oauthClientId: String,
                                    code: String,
                                    redirectUri: Option[String],
                                    createdAt: DateTime)
@@ -51,13 +51,13 @@ class OauthAuthorizationCodeTableDef(tag: Tag) extends Table[OauthAuthorizationC
 
   def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
   def accountId: Rep[Long] = column[Long]("account_id")
-  def oauthClientId: Rep[Long] = column[Long]("client_id")
+  def oauthClientId: Rep[String] = column[String]("client_id")
   def code: Rep[String] = column[String]("code")
   def redirectUri: Rep[Option[String]] = column[Option[String]]("redirect_uti")
   def createdAt: Rep[DateTime] = column[DateTime]("created_at")
 
   def account: ForeignKeyQuery[AccountTableDef, Account] = foreignKey("oauth_authorization_owner_id_fkey", accountId, accounts)(_.id)
-  def client: ForeignKeyQuery[OauthClientTableDef, OauthClient] = foreignKey("oauth_authorization_client_id_fkey", oauthClientId, clients)(_.id)
+  def client: ForeignKeyQuery[OauthClientTableDef, OauthClient] = foreignKey("oauth_authorization_client_id_fkey", oauthClientId, clients)(_.clientId)
 
   def * : ProvenShape[OauthAuthorizationCode] = (id, accountId, oauthClientId, code, redirectUri, createdAt) <> ((OauthAuthorizationCode.apply _).tupled, OauthAuthorizationCode.unapply)
 }
